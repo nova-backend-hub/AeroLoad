@@ -1,0 +1,33 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+
+# PyInstaller builds and dist
+build/
+dist/
+*.spec.bak
+
+# Large binary IPAs and downloads
+*.ipa
+downloads/
+*.zip
+
+# Local device / user caches
+installed_apps.json
+aeroload.log
+EdgeProfile/
+*.log
+
+# Windows metadata
+*.lnk
+Thumbs.db
+
+# Apple Provisioning Profiles & Private Keys
+profiles/
+*.mobileprovision
+*.p12
+*.cer
+*.key

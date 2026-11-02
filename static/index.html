@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AeroLoad · Modern iOS Sideloading & Refresh</title>
+  <link rel="icon" type="image/png" href="/static/icon.png" />
+  <link rel="shortcut icon" href="/static/icon.png" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <svg class="brand-logo" viewBox="0 0 76 65" fill="none">
+        <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" fill="#FFFFFF"/>
+      </svg>
+      <h1>AeroLoad</h1>
+      <span class="brand-badge">v2.0 · Vercel Engine</span>
+    </div>
+
+    <div class="device-pill" style="display:flex;align-items:center;gap:8px;">
+      <span class="status-dot"></span>
+      <select id="header-device-select" style="background:#0a0a0a;border:1px solid #222;border-radius:4px;color:#fff;padding:2px 8px;font-size:12px;font-weight:600;outline:none;cursor:pointer;">
+        <option value="">Detecting device...</option>
+      </select>
+      <button id="btn-refresh-devices" title="Rescan devices" style="background:none;border:none;color:#888;cursor:pointer;padding:2px;display:flex;align-items:center;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      </button>
+      <span class="wifi-info" id="wifi-badge">Wi-Fi Ready</span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="local">Local IPAs</button>
+    <button class="tab-btn" data-tab="library">Community App Library</button>
+    <button class="tab-btn" data-tab="refresh">7-Day Auto Refresh</button>
+    <button class="tab-btn" data-tab="wireless">Wireless Sync</button>
+  </nav>
+
+  <main>
+    <!-- TAB 1: LOCAL IPAS -->
+    <section id="tab-local" class="tab-content">
+      <div class="toolbar">
+        <div class="search-wrapper">
+          <input type="text" id="search-local" class="search-input" placeholder="Search local IPAs by name or bundle id... (⌘K)" />
+        </div>
+        <button class="btn" id="btn-rescan">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          Rescan PC
+        </button>
+      </div>
+      <div id="local-list" class="card-grid">
+        <div style="color:#666;font-size:13px;padding:20px;">Scanning computer for IPAs...</div>
+      </div>
+    </section>
+
+    <!-- TAB 2: COMMUNITY APP LIBRARY -->
+    <section id="tab-library" class="tab-content" style="display:none;">
+      <div class="categories" id="cat-pills">
+        <button class="cat-pill active" data-cat="All">All Categories</button>
+        <button class="cat-pill" data-cat="Emulators">Emulators</button>
+        <button class="cat-pill" data-cat="Tweaked Media">Tweaked Media</button>
+        <button class="cat-pill" data-cat="Utilities">Utilities</button>
+        <button class="cat-pill" data-cat="Games">Games</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-wrapper">
+          <input type="text" id="search-library" class="search-input" placeholder="Search curated library (Delta, YouTube, PPSSPP, UTM...)" />
+        </div>
+      </div>
+      <div id="library-list" class="card-grid"></div>
+    </section>
+
+    <!-- TAB 3: 7-DAY AUTO REFRESH -->
+    <section id="tab-refresh" class="tab-content" style="display:none;">
+      <div class="wifi-card">
+        <div>
+          <div class="wifi-title">Automated 7-Day Refresh Engine</div>
+          <p style="font-size:12px;color:#888;">
+            AeroLoad runs in the background. Every time your iPhone connects to your Wi-Fi or USB, apps nearing expiration are automatically re-signed and refreshed.
+          </p>
+        </div>
+        <button class="btn btn-primary" id="btn-refresh-all">Refresh All Apps Now</button>
+      </div>
+
+      <div style="font-size:12px;color:#888;margin-bottom:12px;font-family:ui-monospace,monospace;">TRACKED SIDELOADED APPS</div>
+      <div id="refresh-list"></div>
+    </section>
+
+    <!-- TAB 4: WIRELESS SYNC SERVER -->
+    <section id="tab-wireless" class="tab-content" style="display:none;">
+      <div class="wifi-card">
+        <div>
+          <div class="wifi-title">Wireless Sideloading Server Active</div>
+          <p style="font-size:12px;color:#888;">
+            You can open AeroLoad directly in Safari on your iPhone to install and refresh apps wirelessly without connecting a cable.
+          </p>
+          <div class="wifi-url" id="server-url">http://192.168.1.54:5050</div>
+        </div>
+        <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('server-url').innerText)">Copy URL</button>
+      </div>
+
+      <div style="background:#0a0a0a;border:1px solid #222;border-radius:8px;padding:20px;">
+        <h4 style="font-size:13px;color:#fff;margin-bottom:8px;">How Wireless Refresh Works:</h4>
+        <ol style="font-size:12px;color:#888;line-height:1.8;padding-left:18px;">
+          <li>Your iPhone pairs with AeroLoad over your local home Wi-Fi network.</li>
+          <li>AeroLoad automatically discovers your phone using Apple Bonjour / usbmux Network protocol.</li>
+          <li>Whenever your apps have less than 2 days remaining, AeroLoad pushes the signed update over Wi-Fi!</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <!-- SIDELOAD MODAL / POPUP CONSOLE -->
+  <div id="modal" class="modal-overlay" style="display:none;">
+    <div class="modal-content" style="width:580px;">
+      <div class="modal-header">
+        <div style="display:flex;gap:12px;align-items:center;">
+          <img id="modal-icon" class="app-icon" src="/static/default_icon.png" alt="Icon" />
+          <div>
+            <h3 id="modal-title" style="font-size:16px;color:#fff;font-weight:700;">App Name</h3>
+            <span id="modal-sub" style="font-size:12px;color:#888;font-family:ui-monospace,monospace;">bundle.id</span>
+          </div>
+        </div>
+        <button class="modal-close" id="modal-close-btn">&times;</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#888;display:block;margin-bottom:4px;text-transform:uppercase;">Target iOS Device</label>
+          <select id="modal-device" style="width:100%;background:#111;border:1px solid #222;color:#fff;padding:8px;border-radius:6px;font-size:12px;">
+            <!-- Dynamically populated from connected USB & Wi-Fi devices -->
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size:11px;font-weight:600;color:#888;display:block;margin-bottom:4px;text-transform:uppercase;">Signing Apple ID</label>
+          <select id="modal-apple-id" style="width:100%;background:#111;border:1px solid #222;color:#fff;padding:8px;border-radius:6px;font-size:12px;">
+            <option value="soliyusef@proton.me">soliyusef@proton.me (Active Certificate)</option>
+            <option value="dawood_hh@hotmail.com">dawood_hh@hotmail.com</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Console Window Header -->
+      <div style="background:#161616;border:1px solid #222;border-bottom:none;border-radius:6px 6px 0 0;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="width:10px;height:10px;border-radius:50%;background:#ff5f56;display:inline-block;"></span>
+          <span style="width:10px;height:10px;border-radius:50%;background:#ffbd2e;display:inline-block;"></span>
+          <span style="width:10px;height:10px;border-radius:50%;background:#27c93f;display:inline-block;"></span>
+          <span style="font-size:11px;color:#aaa;margin-left:8px;font-family:ui-monospace,monospace;font-weight:600;">AeroLoad Console · Live Execution Stream</span>
+        </div>
+        <span id="modal-status-badge" style="font-size:10px;background:#222;color:#00e676;padding:2px 6px;border-radius:4px;font-family:ui-monospace,monospace;">READY</span>
+      </div>
+
+      <!-- Terminal Stream Area -->
+      <div class="terminal-box" id="modal-terminal" style="margin-top:0;border-radius:0 0 6px 6px;height:200px;font-size:11px;line-height:1.6;">[AeroLoad] Ready to codesign and sideload.</div>
+
+      <div style="display:flex;gap:10px;justify-content:space-between;align-items:center;margin-top:14px;">
+        <span id="modal-hint" style="font-size:11px;color:#666;font-family:ui-monospace,monospace;">Click 'Start Sideload' to begin installation</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn" id="modal-cancel">Close</button>
+          <button class="btn btn-primary" id="modal-start-btn">Start Sideload</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+let currentTargetApp = null;
+let activeCategory = "All";
+let libraryApps = [];
+let localIpas = [];
+
+document.addEventListener("DOMContentLoaded", () => {
+  initTabs();
+  fetchDevices();
+  fetchLocalIpas();
+  fetchLibraryApps();
+  fetchRefreshStatus();
+  setupModal();
+  setupSearch();
+
+  const headerDev = document.getElementById("header-device-select");
+  if (headerDev) {
+    headerDev.addEventListener("change", (e) => {
+      selectedDeviceUdid = e.target.value;
+      const modalDev = document.getElementById("modal-device");
+      if (modalDev) modalDev.value = selectedDeviceUdid;
+      
+      const currentDev = connectedDevices.find(d => d.udid === selectedDeviceUdid);
+      const wifiBadge = document.getElementById("wifi-badge");
+      if (wifiBadge && currentDev) {
+        wifiBadge.innerText = currentDev.connection === "USB" ? "USB Connected" : "Wi-Fi Ready";
+      }
+    });
+  }
+
+  const btnRefreshDevs = document.getElementById("btn-refresh-devices");
+  if (btnRefreshDevs) {
+    btnRefreshDevs.addEventListener("click", () => {
+      fetchDevices();
+    });
+  }
+
+  // Poll devices every 10 seconds
+  setInterval(fetchDevices, 10000);
+});
+
+// MARK: - Tabs
+function initTabs() {
+  const tabs = document.querySelectorAll(".tab-btn");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      
+      const target = tab.getAttribute("data-tab");
+      document.querySelectorAll(".tab-content").forEach(c => c.style.display = "none");
+      document.getElementById(`tab-${target}`).style.display = "block";
+    });
+  });
+
+  // Category filter pills in Library
+  const pills = document.querySelectorAll(".cat-pill");
+  pills.forEach(pill => {
+    pill.addEventListener("click", () => {
+      pills.forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      activeCategory = pill.getAttribute("data-cat");
+      renderLibrary(libraryApps);
+    });
+  });
+
+  // URL Query / Hash tab switching support
+  const urlParams = new URLSearchParams(window.location.search);
+  const initialTab = urlParams.get("tab") || window.location.hash.replace("#", "");
+  if (initialTab) {
+    const matchingBtn = document.querySelector(`.tab-btn[data-tab="${initialTab}"]`);
+    if (matchingBtn) matchingBtn.click();
+  }
+  if (urlParams.get("modal") === "console") {
+    openSideloadModal({
+      name: "StillClock",
+      bundle_id: "com.dawood.StillClock",
+      version: "1.0",
+      path: "C:\\AeroLoad\\StillClock.ipa"
+    }, "local");
+  }
+}
+
+// MARK: - Device Info
+let connectedDevices = [];
+let selectedDeviceUdid = "";
+
+async function fetchDevices() {
+  const headerSelect = document.getElementById("header-device-select");
+  const modalSelect = document.getElementById("modal-device");
+  const wifiBadge = document.getElementById("wifi-badge");
+  
+  try {
+    const res = await fetch("/api/devices");
+    const data = await res.json();
+    connectedDevices = data.devices || [];
+    
+    if (connectedDevices.length > 0) {
+      if (!selectedDeviceUdid) {
+        selectedDeviceUdid = connectedDevices[0].udid;
+      }
+      
+      const optionsHtml = connectedDevices.map(d => 
+        `<option value="${escapeHtml(d.udid)}" ${d.udid === selectedDeviceUdid ? 'selected' : ''}>${escapeHtml(d.name)}</option>`
+      ).join("") + `<option value="auto">Auto-detect next device</option>`;
+      
+      if (headerSelect) headerSelect.innerHTML = optionsHtml;
+      if (modalSelect) modalSelect.innerHTML = optionsHtml;
+      
+      const currentDev = connectedDevices.find(d => d.udid === selectedDeviceUdid) || connectedDevices[0];
+      if (wifiBadge) {
+        wifiBadge.innerText = currentDev.connection === "USB" ? "USB Connected" : "Wi-Fi Ready";
+      }
+    } else {
+      const fallbackHtml = `<option value="00008110-001C7C163628201E">Soli's iPhone 14 (Wi-Fi)</option>`;
+      if (headerSelect) headerSelect.innerHTML = fallbackHtml;
+      if (modalSelect) modalSelect.innerHTML = fallbackHtml;
+    }
+  } catch (e) {
+    console.log("Device error:", e);
+  }
+}
+
+// MARK: - Local IPAs
+async function fetchLocalIpas() {
+  const container = document.getElementById("local-list");
+  container.innerHTML = '<div style="color:#666;font-size:13px;padding:20px;">Scanning computer for IPAs...</div>';
+  try {
+    const res = await fetch("/api/local-ipas");
+    const data = await res.json();
+    localIpas = data.ipas || [];
+    renderLocalIpas(localIpas);
+  } catch (e) {
+    container.innerHTML = `<div style="color:#ff4444;font-size:13px;padding:20px;">Failed to scan IPAs: ${e}</div>`;
+  }
+}
+
+function renderLocalIpas(items) {
+  const container = document.getElementById("local-list");
+  if (!items || items.length === 0) {
+    container.innerHTML = '<div style="color:#666;font-size:13px;padding:20px;">No .ipa files found. Use + Add Custom .IPA or browse Community Library.</div>';
+    return;
+  }
+  
+  container.innerHTML = items.map((item, idx) => `
+    <div class="app-card" data-idx="${idx}">
+      <div class="card-left">
+        <img class="app-icon" src="${item.icon_url || '/static/default_icon.png'}" onerror="this.src='/static/default_icon.png'" alt="Icon" />
+        <div class="card-meta">
+          <h3>${escapeHtml(item.name)} <span class="version-tag">v${escapeHtml(item.version)}</span></h3>
+          <div class="card-details">${escapeHtml(item.bundle_id)} · ${item.size_formatted} · ${escapeHtml(item.filename)}</div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sideload-local" data-idx="${idx}">Sideload</button>
+    </div>
+  `).join("");
+
+  container.querySelectorAll(".app-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const idx = parseInt(card.getAttribute("data-idx"), 10);
+      if (localIpas[idx]) openSideloadModal(localIpas[idx], "local");
+    });
+  });
+
+  container.querySelectorAll(".btn-sideload-local").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.getAttribute("data-idx"), 10);
+      if (localIpas[idx]) openSideloadModal(localIpas[idx], "local");
+    });
+  });
+}
+
+// MARK: - Community App Library
+async function fetchLibraryApps() {
+  try {
+    const res = await fetch("/api/app-library");
+    const data = await res.json();
+    libraryApps = data.apps || [];
+    renderLibrary(libraryApps);
+  } catch (e) {
+    console.log("Library error:", e);
+  }
+}
+
+function renderLibrary(items) {
+  const container = document.getElementById("library-list");
+  const filtered = items.filter(a => activeCategory === "All" || a.category === activeCategory);
+  
+  container.innerHTML = filtered.map((app, idx) => `
+    <div class="app-card" data-idx="${idx}">
+      <div class="card-left">
+        <img class="app-icon" src="${app.icon}" onerror="this.src='/static/default_icon.png'" alt="Icon" />
+        <div class="card-meta">
+          <h3>${escapeHtml(app.name)} <span class="version-tag">v${escapeHtml(app.version)}</span></h3>
+          <div style="font-size:12px;color:#aaa;margin-bottom:3px;">${escapeHtml(app.description)}</div>
+          <div class="card-details">${escapeHtml(app.category)} · Developer: ${escapeHtml(app.developer)}</div>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-sideload-lib" data-idx="${idx}">Install App</button>
+    </div>
+  `).join("");
+
+  container.querySelectorAll(".app-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const idx = parseInt(card.getAttribute("data-idx"), 10);
+      if (filtered[idx]) openSideloadModal(filtered[idx], "library");
+    });
+  });
+
+  container.querySelectorAll(".btn-sideload-lib").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.getAttribute("data-idx"), 10);
+      if (filtered[idx]) openSideloadModal(filtered[idx], "library");
+    });
+  });
+}
+
+// MARK: - 7-Day Refresh Status
+async function fetchRefreshStatus() {
+  try {
+    const res = await fetch("/api/refresh-status");
+    const data = await res.json();
+    const container = document.getElementById("refresh-list");
+    const apps = data.apps || [];
+    
+    if (apps.length === 0) {
+      container.innerHTML = '<div style="color:#666;font-size:13px;padding:12px;">No sideloaded apps tracked yet. Sideload an app to enable auto-refresh.</div>';
+      return;
+    }
+
+    container.innerHTML = apps.map(app => `
+      <div class="refresh-card">
+        <div>
+          <div style="font-size:14px;font-weight:600;color:#fff;">${escapeHtml(app.name)} <span style="font-size:11px;color:#888;">(${escapeHtml(app.bundle_id)})</span></div>
+          <div style="font-size:12px;color:#aaa;margin-top:2px;">Signed by: ${escapeHtml(app.apple_id)}</div>
+          <div class="countdown-bar-wrapper">
+            <div class="countdown-bar" style="width: ${app.percent_remaining}%;"></div>
+          </div>
+          <div style="font-size:11px;color:#888;margin-top:4px;font-family:ui-monospace,monospace;">
+            ${app.days_remaining} days remaining (Expires in ${Math.round(app.days_remaining * 24)}h)
+          </div>
+        </div>
+        <div>
+          <button class="btn ${app.needs_refresh ? 'btn-primary' : ''}" onclick="refreshSingleApp('${escapeHtml(app.bundle_id)}')">
+            ${app.needs_refresh ? 'Auto-Refresh Due' : 'Refresh Now'}
+          </button>
+        </div>
+      </div>
+    `).join("");
+  } catch (e) {
+    console.log("Refresh status error:", e);
+  }
+}
+
+// MARK: - Modal & Sideload Execution
+function setupModal() {
+  const modal = document.getElementById("modal");
+  const closeBtn = document.getElementById("modal-close-btn");
+  const cancelBtn = document.getElementById("modal-cancel");
+  const startBtn = document.getElementById("modal-start-btn");
+
+  const close = () => modal.style.display = "none";
+  closeBtn.addEventListener("click", close);
+  cancelBtn.addEventListener("click", close);
+
+  // Close when clicking overlay outside content
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) close();
+  });
+
+  startBtn.addEventListener("click", async () => {
+    if (!currentTargetApp) return;
+    startBtn.disabled = true;
+    startBtn.innerText = "Sideloading...";
+    
+    const terminal = document.getElementById("modal-terminal");
+    const statusBadge = document.getElementById("modal-status-badge");
+    if (statusBadge) {
+      statusBadge.innerText = "PROCESSING";
+      statusBadge.style.background = "#332600";
+      statusBadge.style.color = "#ffbd2e";
+    }
+
+    const timeNow = new Date().toLocaleTimeString();
+    terminal.innerText += `\n\n[${timeNow}] >>> Starting deployment for ${currentTargetApp.name}...\n`;
+    terminal.scrollTop = terminal.scrollHeight;
+    
+    const appleId = document.getElementById("modal-apple-id").value;
+    const deviceSelect = document.getElementById("modal-device");
+    const targetUdid = (deviceSelect && deviceSelect.value !== "auto") ? deviceSelect.value : null;
+    
+    try {
+      const endpoint = currentTargetApp._type === "library" ? "/api/download-and-sideload" : "/api/sideload";
+      const payload = currentTargetApp._type === "library" ? 
+        { download_url: currentTargetApp.download_url, name: currentTargetApp.name, bundle_id: currentTargetApp.bundle_id, apple_id: appleId, udid: targetUdid } :
+        { ipa_path: currentTargetApp.path, name: currentTargetApp.name, bundle_id: currentTargetApp.bundle_id, apple_id: appleId, udid: targetUdid };
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      
+      if (result.logs && result.logs.length > 0) {
+        terminal.innerText += result.logs.join("\n") + "\n";
+      }
+      
+      if (result.success) {
+        terminal.innerText += `\n[${new Date().toLocaleTimeString()}] [+] [SUCCESS] App successfully installed and running on your device!\n`;
+        if (statusBadge) {
+          statusBadge.innerText = "SUCCESS";
+          statusBadge.style.background = "#052e16";
+          statusBadge.style.color = "#22c55e";
+        }
+        fetchRefreshStatus();
+      } else {
+        terminal.innerText += `\n[${new Date().toLocaleTimeString()}] [!] Installation error. Please verify USB cable or ensure iPhone screen is unlocked.\n`;
+        if (statusBadge) {
+          statusBadge.innerText = "FAILED";
+          statusBadge.style.background = "#450a0a";
+          statusBadge.style.color = "#ef4444";
+        }
+      }
+    } catch (err) {
+      terminal.innerText += `\n[${new Date().toLocaleTimeString()}] [ERROR] Connection failed: ${err}\n`;
+      if (statusBadge) {
+        statusBadge.innerText = "ERROR";
+        statusBadge.style.background = "#450a0a";
+        statusBadge.style.color = "#ef4444";
+      }
+    } finally {
+      terminal.scrollTop = terminal.scrollHeight;
+      startBtn.disabled = false;
+      startBtn.innerText = "Start Sideload";
+    }
+  });
+}
+
+function openSideloadModal(item, type) {
+  if (!item) return;
+  item._type = type;
+  currentTargetApp = item;
+
+  const modalDevSelect = document.getElementById("modal-device");
+  if (modalDevSelect && selectedDeviceUdid) {
+    modalDevSelect.value = selectedDeviceUdid;
+  }
+  const selectedName = (modalDevSelect && modalDevSelect.selectedOptions && modalDevSelect.selectedOptions[0]) 
+    ? modalDevSelect.selectedOptions[0].text 
+    : "selected iPhone";
+
+  document.getElementById("modal-title").innerText = item.name;
+  document.getElementById("modal-sub").innerText = item.bundle_id || item.developer || "iOS Application";
+  document.getElementById("modal-icon").src = item.icon || item.icon_url || "/static/default_icon.png";
+  
+  const statusBadge = document.getElementById("modal-status-badge");
+  if (statusBadge) {
+    statusBadge.innerText = "READY";
+    statusBadge.style.background = "#222";
+    statusBadge.style.color = "#00e676";
+  }
+
+  const terminal = document.getElementById("modal-terminal");
+  const timeNow = new Date().toLocaleTimeString();
+  terminal.innerText = 
+`[${timeNow}] [AeroLoad Console v2.0 · Ready]
+• Target Application: ${item.name} (${item.bundle_id || 'com.app'})
+• Source Location:   ${item.path || item.download_url}
+• Target iOS Device: ${selectedName}
+• Code Signer:       Apple Developer Certificate (soliyusef@proton.me)
+
+Click "Start Sideload" to codesign binary and push directly to device.`;
+
+  document.getElementById("modal").style.display = "flex";
+}
+
+async function refreshSingleApp(bundleId) {
+  alert(`Refreshing ${bundleId} for another 7 days...`);
+  await fetch("/api/refresh-all", { method: "POST" });
+  fetchRefreshStatus();
+}
+
+function setupSearch() {
+  document.getElementById("search-local").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    const filtered = localIpas.filter(i => i.name.toLowerCase().includes(q) || (i.bundle_id && i.bundle_id.toLowerCase().includes(q)));
+    renderLocalIpas(filtered);
+  });
+
+  document.getElementById("search-library").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    const filtered = libraryApps.filter(a => a.name.toLowerCase().includes(q) || a.description.toLowerCase().includes(q));
+    renderLibrary(filtered);
+  });
+
+  document.getElementById("btn-rescan").addEventListener("click", fetchLocalIpas);
+  document.getElementById("btn-refresh-all").addEventListener("click", async () => {
+    alert("Triggering 7-day refresh for all installed apps...");
+    await fetch("/api/refresh-all", { method: "POST" });
+    fetchRefreshStatus();
+  });
+}
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+
+</script>
+</body>
+</html>
+
